@@ -2,13 +2,13 @@
 # include <stdlib.h>
 # include <string.h>
 
-# define CHUNK 512	 // read 1024 bytes at a time
+# define CHUNK 512	 // read 512 bytes at a time
 
 int main(int argc, char **argv)
 {
 	// Initialize Variables
 	FILE *fp, *fpn;
-	long int size;
+	int size = CHUNK;;
 	char *buf;
 
 	// Check arguments
@@ -33,11 +33,6 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	// Get file size
-	fseek(fp, 0, SEEK_END);
-	size = CHUNK; //ftell(fp);
-	rewind(fp);
-
 	// Allocate memory for the file chunks
 	buf = (char*) malloc(sizeof(char) * (size + 1)); // Casts allocated memory to char type
 
@@ -46,8 +41,6 @@ int main(int argc, char **argv)
 		perror("Memory could not be allocated");
 		return -1;
 	}
-
-	// Read a chunk of the file
 
 	char *token;
 	const char sep[3] = "\t";
@@ -67,7 +60,6 @@ int main(int argc, char **argv)
 		}
 
 	}
-
 
 	// Close file and free mem
 	fclose(fp);

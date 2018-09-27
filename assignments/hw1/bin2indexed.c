@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /*
 	The purpose of this program is to take a binary file containing a user id, item id
@@ -31,6 +32,7 @@ const int get_item(FILE *fpc)
 
 	// Read each char in fp until the next pipe '|'
 	while((c = fgetc(fp)) != '|'){
+		
 		item[n++] = (char) c; // store the chare in the item array
 	}
 
@@ -48,6 +50,17 @@ const int get_item(FILE *fpc)
 	return result;
 }
 
+// A function that returns the number of digits in a number
+const int get_num_digits(long num)
+{
+	int count = 0;
+	
+	while(num > 9){
+		num = num / 10;
+	}
+	
+	return (int) num + 1;
+}
 
 // A function that returns the index of the provided item from the file
 const long get_item_index(long item, FILE *fp)
@@ -56,21 +69,25 @@ const long get_item_index(long item, FILE *fp)
 	fseek(fp, 0, SEEK_SET);
 
 	// Initialize variables
-	const int file_start = ftell(fp); 		// File location at start
+	const int file_start = ftell(fp); 			// File location at start
 	long cur_item = -1, cur_idx = file_start; 	// Curent item and index of current item
-	int c;						// Char to be read
-	char cur_c;					// Char to be compared with '\n'
+	int c;										// Char to be read
+	char cur_c;									// Char to be compared with '\n'
 
 	// To find the item index:
 	do{
+		
 		// If at file start
 		if(ftell(fp) == file_start){
+			
 			// Get the first item
 			cur_item = get_item(fp);
 		} else {
+			
 			// Otherwise -> somewhere else in file
 			// Loop through chars until \n is found
 			while((c = fgetc(fp)) != EOF){
+				
 				// Searching
 				cur_c = (char) c;
 
@@ -88,11 +105,17 @@ const long get_item_index(long item, FILE *fp)
 
 			// \n was found, now check for the current item
 			cur_item = get_item(fp);
+			
+			// Get the current index
+			cur_idx = ftell(fp);
+			
 		}
 	} while (cur_item != item);
 
-	// Get the current index
-	cur_idx = ftell(fp);
+	if(cur_idx > 0){
+		// subtract 1 for the pipe char and num_digits for the number of digits 
+		cur_idx = cur_idx - get_num_digits(cur_item) - 1;
+	}
 
 	// return
 	return cur_idx;
@@ -103,7 +126,6 @@ int main(int argc, char **argv)
 	// Initialize Variables
 	FILE *fp_bin, *fp_idx, *fpn_bin;
 	struct Entry entry;
-	long index, max_index;
 
 	// Check arguments
 	if(argc != 4){
@@ -130,17 +152,15 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	// Get the max index of the item file
-
 	// Loop through binary file
 	while(fread(&entry, sizeof entry, 1, fp_bin) > 0){ // Get the current entry
 
-		printf("\nCurrent Entry: %d\t%d\t%d\t%d\n", entry.user, entry.item, entry.rating, entry.timestamp);
+		//printf("\nCurrent Entry: %d\t%d\t%d\t%d\n", entry.user, entry.item, entry.rating, entry.timestamp);
 
-		// Look for the current entry index
+		// Get the item's entry index
 		entry.item = get_item_index(entry.item, fp_idx);
 
-		printf("\tIndex Item: %d\n", entry.item);
+		//printf("\tIndex Item: %d\n", entry.item);
 
 		// Write the indexed entry to the output binary file
 		if(fwrite(&entry, sizeof(entry), 1, fpn_bin) == -1){
