@@ -28,16 +28,12 @@ int fwr_float(FILE *f_in, FILE *f_out){
 	
 	if(f_out == NULL){
 		perror("Output file could not be opened for copying");
+		return(-1);
 	}
-
-	// While not end of file
-	while(0){
-		fread(&num, sizeof(num), 1, f_in);		// Read next float into num
-		
-		if(feof(f_in) != 0){
-			break;
-		}
-		
+	
+	// Read next float into num
+	while(fread(&num, 1, sizeof(num), f_in) == sizeof(num)){
+		if (debug) printf("\t\t%f\n", num);
 		fwrite(&num, sizeof(num), 1, f_out);	// Write the float into f_out
 	}
 	
@@ -55,6 +51,39 @@ int ndigits(unsigned int num){
 	}
 	
 	return count;
+}
+
+int is_file_sorted(FILE *fp){
+	/* Checks that fp is sorted	(ascending)*/
+	
+	if(fp == NULL){
+		perror("File could not be opened for verification");
+		return -1;
+	}
+	
+	// Go to file beginning
+	rewind(fp);
+	
+	float num1, num2;
+	
+	// Read first num
+	fread(&num1, 1, sizeof(num1), fp);
+	
+	// Read second num
+	while (fread(&num2, 1, sizeof(num2), fp) == sizeof(num2)){
+		
+		// check ascending
+		if (num1 <= num2){
+			// File is still sorted
+			num1 = num2;
+		} else {
+			// File is not sorted
+			return -1;
+		}
+	}
+	
+	// File is sorted
+	return 0;
 }
 
 int oocmerge(unsigned int num_files, char* output_file){
@@ -89,74 +118,97 @@ int oocmerge(unsigned int num_files, char* output_file){
 		
 			// We are at round end (since the num files is still > 1)
 			
-			round += 1; 				// increment the round by 1
-			cr_file_idx = 1;	 		// reset the file idx to starting positions
+			round += 1; 					// increment the round by 1
+			cr_file_idx = 1;	 			// reset the file idx to starting positions
 			nr_file_idx = 1;
 		
-		} else { 						// File fp1 Exists:
+		} else { 							// File fp1 Exists:
 			
 			// At least one file exists, so:
-			fp1 = fopen(s1, "rb");
+			
+			chmod(s1, S_IRUSR);				// Change to read perms
+			fp1 = fopen(s1, "rb");			// Read file
+			
+			chmod(s_next, S_IWUSR);			// Change to write perms
 			fp_next = fopen(s_next, "wb");	// Create new fp_next file
 			
-			if( access(s2, R_OK) != 0){ // File fp2 DNE
-				if (debug) printf("\tfp2 DNE\n");
+			if( access(s2, R_OK) != 0){ 	// File fp2 DNE
+				if (debug) printf("\tfp2 DNE: -> writing fp1 to f_next\n");
 			
 				// Write fp1 to fp_next
 				fwr_float(fp1, fp_next);
 			
-				cr_file_idx += 1;	// increment by 1 for round-terminating base case
+				cr_file_idx += 1;			// increment by 1 for round-terminating base case
 				
 				// close files
 				fclose(fp1);
 				fclose(fp_next);
+				
+				// Delete file fp1
+				remove(s1);
 
-			} else { 					// File fp2 Exists:
+			} else { 						// File fp2 Exists:
 				
 				// If here, both files can assumed to be read at least once
-				fp2 = fopen(s2, "rb");
-				reading = 1;
+				if (debug) printf("\tfp1 and fp2 Exist:\n");
 				
+				chmod(s2, S_IRUSR);		// Change to read perms
+				fp2 = fopen(s2, "rb"); 	// Read 
+					
 				// get first number from both files
 				fread(&fp1_num, sizeof(fp1_num), 1, fp1);
 				fread(&fp2_num, sizeof(fp2_num), 1, fp2);
-			
-				while (reading == 1){ // Workhorse merging algorithm
-				
-					// Compare file arrays one by one
-				
-					if (fp1_num <= fp2_num){
-						// write fp1_num to fp_next
-						fwrite(&fp1_num, sizeof(fp1_num), 1, fp_next);
-						
-						if (debug) printf("\t%f < %f\n", fp1_num, fp2_num);
 					
-						if (feof(fp1) != 0){ // End of fp1
+				while (1){ // Workhorse merging algorithm
+
+					// Check if EOF after file read					
+					if (feof(fp1) && feof(fp2)){
+						// both files are EOF
+						if (debug) printf("\tBoth files are EOF\n");
+						break;
+						
+					} else {	// At least one file is not EOF
+						
+						if (feof(fp1)){ 				// End of fp1
 							// Stop reading and write fp2 to fp_next
-							reading = 0; 
-							fwr_float(fp2, fp_next);
-			
-						} else {
-							// Read next float from fp1
-							fread(&fp1_num, sizeof(fp1_num), 1, fp1);
-						}
-					} else { // fp1_num > fp2_num
-						// write fp2_num to fp_next
-						fwrite(&fp2_num, sizeof(fp2_num), 1, fp_next);
-						
-						if (debug) printf("\t%f < %f\n", fp2_num, fp1_num);
-					
-						if (feof(fp2)){
-							// Stop reading and write fp1 to fp_next
-							reading = 0;
-							fwr_float(fp1, fp_next);
+							if (debug) printf("\tfp1 EOF: -> writing fp2 to f_next\n");
 							
-						} else {
-							// Read next float from fp2
-							fread(&fp2_num, sizeof(fp2_num), 1, fp2);
+							fwrite(&fp2_num, sizeof(fp2_num), 1, fp_next);		// Write current fp2_num
+							fwr_float(fp2, fp_next);							// Write rest of fp2
+							
+							break;
+			
+						} else if (feof(fp2)){ 			// End of fp2
+							// Stop reading and write fp1 to fp_next
+							if (debug) printf("\tfp2 EOF: -> writing fp1 to f_next\n");
+							
+							fwrite(&fp1_num, sizeof(fp1_num), 1, fp_next);		// Write current fp1_num 
+							fwr_float(fp1, fp_next);							// Write rest of fp1
+							
+							break;	
+							
+						} else { 						// Both files not at EOF
+							if (fp1_num <= fp2_num){
+								// write fp1_num to fp_next
+								fwrite(&fp1_num, sizeof(fp1_num), 1, fp_next);
+								
+								if (debug) printf("\t%f < %f\n", fp1_num, fp2_num);
+					
+								// Read next fp1_num
+								fread(&fp1_num, sizeof(fp1_num), 1, fp1);
+					
+							} else { // fp1_num > fp2_num
+								// write fp2_num to fp_next
+								fwrite(&fp2_num, sizeof(fp2_num), 1, fp_next);
+						
+								if (debug) printf("\t%f < %f\n", fp2_num, fp1_num);
+								
+								// Read next fp2_num
+								fread(&fp2_num, sizeof(fp2_num), 1, fp2);
+
+							}
 						}
 					}
-						
 				} // end reading loop
 				
 				if (debug) printf("\tOutput written to: %s\n", s_next);
@@ -165,57 +217,41 @@ int oocmerge(unsigned int num_files, char* output_file){
 				fclose(fp1);
 				fclose(fp2);
 				fclose(fp_next);
+				
+				// Delete files fp1, fp2
+				remove(s1);
+				remove(s2);
 			
 				cr_file_idx += 2; 		// increment by 2 for next pair of files
 				nr_file_idx += 1;		// increment by 1 for the next output file
 			}
+			
+			//decrement by 1 as one loop processes 2 files into 1 file
+			num_files--;
 		}
-		
-		//decrement by 1 as one loop processes 2 files into 1 file
-		num_files--;
+
 		if (debug) printf("\tnum_files: %u\n", num_files);
 	}
 	
 	sprintf(s_last, FNAME_TEMPLATE, round + 1, 1);
 	
-	FILE *fp = fopen(s_last, "rb");
+	FILE *fp = fopen(s_last, "rb");				// Open the last temp file
+	FILE *fp_out = fopen(output_file, "wb"); 	// Open the output file
 	
-	if (fp == NULL){
-		fprintf(stderr, "Could not read file at: %s\n", s_last);
-	}
-	
-	// get first number of the last file
-	fread(&fp1_num, sizeof(fp1_num), 1, fp);
-	
-	if (debug) printf("Checking output file:\n");
-	
-	while (feof(fp) == 0){
-		// get the next number
-		fread(&fp2_num, sizeof(fp2_num), 1, fp);
-		
-		// check that first < second
-		if (fp1_num > fp2_num){
-			fprintf(stderr, "Final temp file was not sorted: (%f, %f)\n", fp1_num, fp2_num);
-			return -1;
-		} else {
-			// Move to the next number
-			if (debug) printf("\t%f\n", fp1_num);
-			fp1_num = fp2_num;
-		}
-	}
-	
-	if (debug) printf("Final temp file was sorted!\n");
-	
-	// file is sorted
-	rewind(fp); // move fp back to start
-	
-	FILE *fp_out = fopen(output_file, "wb"); // Open the output file
+	chmod(s_last, S_IRUSR);
+	chmod(output_file, S_IWUSR);
 	
 	fwr_float(fp, fp_out); // Write the contents of the last temp file to output file
 	
 	// close files
 	fclose(fp);
 	fclose(fp_out);
+	
+	// change perms
+	chmod(output_file, S_IRUSR);
+	
+	// Delete file fp
+	remove(s_last);
 	
 	return 0;
 }
@@ -297,6 +333,13 @@ int main(int argc, char *argv[]){
 	
 	if (oocmerge(N, argv[2]) != 0){
 		perror("oocmerge failed");
+		return -1;
+	}
+	
+	FILE *fp = fopen(argv[2], "rb");
+	
+	if (is_file_sorted(fp) != 0){
+		perror("Output file was not sorted");
 		return -1;
 	}
 	
