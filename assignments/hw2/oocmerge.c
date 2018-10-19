@@ -9,6 +9,7 @@ int debug = 1;
 
 char FNAME_TEMPLATE[] = "./temp/temp_%u_%u.bin";	
 int MAX_LEN = 100;
+
 /*
 "temp_<r>_<idx>.bin" 
  - <r> current round number 
@@ -90,6 +91,8 @@ int oocmerge(unsigned int num_files, char* output_file){
 	/* 
 	Merges <num_files> in ./temp containing floating point numbers a writes the sorted numbers into one output_file
 	Does so in an out-of-core fashion such that minimal memory is utilized
+
+	Returns -1 if an error is encountered or the final data is not sorted (fails verification)
 	*/ 
 	
 	// Define:
