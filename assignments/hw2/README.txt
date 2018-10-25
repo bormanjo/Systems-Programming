@@ -1,5 +1,7 @@
 OUT OF CORE MERGESORT (OOC MERGESORT)
 
+by John-Craig Borman (10402229)
+
 Objective:
 	- Create a program that implements the merge sort algorithm without storing all the data in memory
 	
@@ -15,7 +17,7 @@ Process:
 	X. Create a directory named 'temp'
 		X). Change permissions to allow accessibility to ONLY the user
 	X). Write temporary files as the medium to store intermediate arrays
-		a). Change permissions of these files:
+		X). Change permissions of these files:
 			+ Can only be written when used as output
 			+ Can only be read when used as input
 			+ Only the user has access
@@ -32,7 +34,7 @@ Steps:
 		
 		
 Assumptions:
-	1. Assume N is positive and less than 1000
+	1. Assume N is positive and less than or equal to 1000
 	2. Sorting will be in ASCENDING order
 	3. Arrays of any kind are not allowed
 	4. All data is held in binary formats
