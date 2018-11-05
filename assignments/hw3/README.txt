@@ -11,29 +11,29 @@ Objective:
 			- Launch user's commands and let OS handle errors
 
 Requirements:
-	1. Prompt has form:
+	X. Prompt has form:
 		- "SWS:username:directory>"
 			- "SWS" is a fixed identifier
 			- "username" - retrieve from password file using the user's uid (getpwuid())
 			- "directory" - retrieve the current working directory
 			
 			=> See the 3rd set of notes
-	2. Tokenize the input string via strtok()
+	X. Tokenize the input string via strtok()
 		- Assume that commands, options and arguments are separated by spaces
-	3. Built-in commands:
+	X. Built-in commands:
 		- cd and exit
 			Execute WITHOUT forking a new process
-	4. Non-Built-in commands:
+	X. Non-Built-in commands:
 		- if '&' is at the end of an input string, the process should be executed in the background
 		- Ensure there are NO ZOMBIES
 			- Before process starts in bg, print the PID number and the input string:
 				=> pid: 1366 cmd: ks
 			- After the child process is reaped, print its pid again:
 				=> pid 1366 done
-	5. Foreground execution:
+	X. Foreground execution:
 		- A child process should be forked and the parent process should wait for it. 
 		- No printouts should appear
-	6. Install signal handlers for SIGINT and SIGCHLD using signal()
+	X. Install signal handlers for SIGINT and SIGCHLD using signal()
 		- SIGINT should be disabled for the parent process
 			- print '\n' when received
 			- Shell SHOULD NOT BE TERMINATED
