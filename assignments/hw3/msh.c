@@ -5,93 +5,120 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <signal.h>
+#include <string.h>
+#include "csapp.h"
 
-int debug = 0;
+int debug = 1;
 int MAX_LEN = 1000;
 
 // run_fg - runs a command and arguments in the fg via fork
-int run_fg(char *argv[], int argc){
-	// process variables
+int run_fg(char **argv, int argc){
+
 	pid_t pid;	// The pid and status of the child process
 	int stat;
-	
-	// signal handling
-	sigset_t mask_all, mask_one, prev_one;
-	
-	// sigfillset(&mask_all);
-	// sigemptyset(&mask_one);
-	// sigaddset(&mask_one, SIGCHLD);
-	
-	// copy arguments from argv to argv_new, 
-	char *argv_new[argc-1];
-	for(int i = 1; i < argc; i++){	// First argument is the command, exclude it	
-		argv_new[i-1] = argv[i];
-	}
-	
-	// sigprocmask(SIG_BLOCK, &mask_one, &prev_one); // Block SIGCHLD
+
 	if ((pid = fork()) == 0){
 		// Execute command and arguments
 		if (debug) printf("Child process: Executing in foreground\n");
 		
-		// Unblock SIGCHLD
-		// sigprocmask(SIG_SETMASK, &prev_one, NULL);	// Unblock SIGCHLD
-		
 		// Exec (cmd, args);
-		execv(argv[0], argv_new);
-	} else {
+		execvp(argv[0], argv);
+		
+		sleep(2);
+		
+		exit(0);
+		
+	} else if (pid > 0) {
 		if (debug) printf("Parent process: Waiting for child\n");
 		
-		// Block all
-		// sigprocmask(SIG_BLOCK, &mask_all, NULL);
+		wait(NULL);
 		
-		waitpid(pid, &stat, 0);
+	} else {
+		perror("fork failure");
+		return -1;
 	}
 	
 	return 0;
 }
 
 // run_bg - runs a command and arguments in the bg via exec
-int run_bg(char *argv[], int argc){
+int run_bg(char **argv, int argc){
+	
 	pid_t pid;	// The pid and status of the child process
 	int stat;
 	
-	// copy arguments from argv to argv_new, 
-	char *argv_new[argc-2];
-	for(int i = 1; i < argc - 1; i++){	// First argument is the command, exclude it	
-		argv_new[i-1] = argv[i];		// Last argument is the '&' bg identifier, exclude it
-	}
-	
 	if ((pid = fork()) == 0){
-		if (debug) printf("Child process: Executing in background");
-		printf("pid: %d cmd: %s", argv[0]);
+		
+		if (debug) printf("Child process: Executing in background\n");
+		
+		printf("pid: %d cmd: ", getpid());
+		
+		for(int i = 0; i < argc; i++){
+			printf("%s ", argv[i]);
+		}
+		
+		printf("\n");
 		
 		// Exec (cmd, args);
-		execv(argv[0], argv_new);
-	} else {
+		execvp(argv[0], argv);
+		
+		sleep(2);
+		
+		exit(0);
+		
+	} else if (pid > 0){
+		
+		if (debug) printf("Parent process: Waiting WNOHANG\n");
 		waitpid(pid, &stat, WNOHANG);
+		
+	} else {
+		perror("fork failure");
+		return -1;
 	}
 	
 	return 0;
 }
 
-
+int parse_line(char *istr, char **argv){
+	int i = 0, len;		// Keeps track of the current idx
+	
+	if ((len = strcspn(istr, "\n")) == 0){
+		return -1;
+	}		
+	
+	istr[len] = 0;	// Remove newline (due to fgets)
+	
+	argv[i] = strtok(istr, " "); 	// Parse the first argument
+	
+	while(argv[i] != NULL){					// While arguments are parsed
+		argv[++i] = strtok(NULL, " "); 		// Store the argument at the next i
+	}
+	
+	if (debug){	// Print the stored commands
+		printf("Parsed args:\n");
+		for(int j = 0; j < i; j++){
+			printf("\t%s\n", argv[j]);
+		}
+	}
+	
+	return i - 1;
+}
 
 // msh
 int msh(){
 	// process variables
 	pid_t wpid;
-	int stat = 0, i = 0;
+	int argc, stat = 0;
 	struct passwd *pw;
-	char directory[MAX_LEN], prompt[MAX_LEN], istr[MAX_LEN];
-	char sep = ' ', *tok[50];
-	
+	char directory[MAX_LEN], istr[MAX_LEN];
+	char *argv[100];
+	int running = 1;
+
+		
 	// Get username
 	pw = getpwuid(getuid());
-	char username = pw->pw_name;
 	
-	initjobs();
-	
-	while(1){
+	while(running){
 		// Get current directory
 		if (getcwd(directory, sizeof(directory)) == NULL){
 			perror("getcwd() error");
@@ -99,47 +126,68 @@ int msh(){
 		}
 		
 		// Get prompt
-		sprintf(prompt, "SWS:%s:%s>", username, directory); // prompt = "SWS:username:current directory>"
-			
+		printf("SWS:%s:%s>", pw->pw_name, directory); // prompt = "SWS:username:current directory>"
+		
 		// Get input string as istring
 		fgets(istr, MAX_LEN, stdin);
 		
-		// Process istring
-		tok[0] = strtok(istr, sep);		// Tokenize istring
+		if (debug) printf("Input String: %s\n", istr);
 		
-		while(tok[i] != NULL){
-			i++;
-			tok[i] = strtok(NULL, sep);
-		}	
+		argc = parse_line(istr, argv);	
+		
+		if (argc >= 0){
+		
+			if (debug) printf("First token: %s\n", argv[0]);
 			
-		if (debug) printf("First token: %s", tok[0]);
-			
-		// Check first argument
-		if (tok[0] == "cd"){
-			// change directory to remaining command arguments
-			chdir(tok[1]);
-		} else if (tok[0] == "exit"){
-			break;	// BREAK LOOP
-		} else {
-			// Check last argument:
-			if(tok[i] == '&'){
-				// exec in bg
-				run_bg(&tok, i);
-			} else {
-				// exec in fg
-				run_fg(&tok, i);
-			}
-			
-		}
+			// Check first argument
+			if (strcmp(argv[0], "cd") == 0){
+				// change directory to remaining command arguments
+				if (argc >= 1){
+					if (debug) printf("Change directory to: %s\n", argv[1]);
+					
+					chdir(argv[1]);
+				}
+				
+			} else if (strcmp(argv[0], "exit") == 0){
+				
+				if (debug) printf("Exiting shell\n");
+				
+				killpg(getpid(), SIGTERM);
 
-	}
-	
-	// Wait for bg processes
-	while ((wpid = wait(&stat)) > 0){
+				running = 0;	// BREAK LOOP
+			} else {
+				printf("here2\n");
+				
+				// Check last argument:
+				if(strcmp(argv[argc], "&") == 0){
+					
+					if (debug) printf("Running in BG\n");
+					
+					argv[argc] = NULL;
+					
+					// exec in bg
+					run_bg(argv, argc);
+				} else {
+					
+					if (debug) printf("Running in FG\n");
+					
+					// exec in fg
+					run_fg(argv, argc);
+				}
+				
+			}
+		
+		}
+		
+		while((wpid = waitpid(-1, 0, WNOHANG)) > 0){
+			sio_puts("pid: ");
+			sio_putl((long) wpid);
+			sio_puts(" done\n");
+		}
 		
 	}
 	
-	exit(0);
+	return 0;
 }
 
 
@@ -147,7 +195,7 @@ int msh(){
 void cp_handler(int sig){
 	pid_t pid;
 	
-	while((pid = wait(NULL)) > 0){
+	while((pid = waitpid(-1, 0, WNOHANG)) > 0){
 		sio_puts("pid: ");
 		sio_putl((long) pid);
 		sio_puts(" done\n");
