@@ -3,8 +3,8 @@
 #include <sys/time.h>
 #include "array.h"
 
-const int debug = 1;		// 1: Print debug info
-const int consecutive = 1;	// 1: Fill matrix with sequential values
+const int debug = 0;		// 1: Print debug info
+const int consecutive = 0;	// 1: Fill matrix with sequential values
 
 int min(int a, int b){
 	if(a < b){
@@ -42,7 +42,7 @@ int transpose(float A[], int w, int h, int m){
 		for(int y = 0; y < w; y+=m){
 			
 			if(debug){
-				printf("Transposing block at (%d, %d):\n", x, y);
+				printf("Transposing (%d x %d) block at (%d, %d):\n",m, m, x, y);
 				print_matrix(A, w, h);
 			}
 			
@@ -55,10 +55,16 @@ int transpose(float A[], int w, int h, int m){
 			
 			if(debug){
 				printf("Block transposed:\n");
-				print_matrix(A, h, w);
+				print_matrix(A, w, h);
 				printf("+--------------------------------+\n");
 			}
 		}
+	}
+	
+	if(debug){
+		printf("Final matrix transposed:\n");
+		print_matrix(A, h, w);
+		printf("+--------------------------------+\n");
 	}
 }
 
